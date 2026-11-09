@@ -30,4 +30,12 @@ class Payment extends Model
     {
         return $this->belongsTo(Bill::class);
     }
+
+    /**
+     * Accessor for payment_method as alias to payment_type.
+     */
+    public function getPaymentMethodAttribute(): ?string
+    {
+        return $this->payment_type;
+    }
 }

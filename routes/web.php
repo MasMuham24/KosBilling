@@ -60,9 +60,11 @@ Route::middleware('auth')->group(function () {
     Route::resource('tenants', TenantController::class);
     Route::post('bills/generate', [BillController::class, 'generate'])->name('bills.generate');
     Route::post('bills/{bill}/mark-as-paid', [BillController::class, 'markAsPaid'])->name('bills.mark_as_paid');
+    Route::post('/bills/{bill}/send-reminder', [BillController::class, 'sendReminder'])->name('bills.sendReminder');
     Route::resource('bills', BillController::class);
 });
 
 // Route akses publik untuk pembayaran/invoice penyewa (bisa dibuka via tautan WhatsApp)
 Route::get('pay/{bill}', [BillController::class, 'show'])->name('bills.pay');
+Route::get('invoice/{bill}', [BillController::class, 'show'])->name('invoice.show');
 Route::post('pay/{bill}/success', [BillController::class, 'paymentSuccess'])->name('bills.payment_success');

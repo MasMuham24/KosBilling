@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Services\MidtransService;
+use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -248,5 +249,28 @@ class BillController extends Controller
         });
 
         return back()->with('success', "Tagihan #INV-" . str_pad($bill->id, 5, '0', STR_PAD_LEFT) . " berhasil ditandai Lunas.");
+    }
+
+    /**
+     * Kirim notifikasi tagihan via WhatsApp Gateway lokal (Baileys).
+     */
+    public function sendReminder(Bill $bill, WhatsAppService $waService)
+    {
+        if ($bill->room->property->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $sent = $waService->sendMessage(
+            $bill->tenant->whatsapp_number,
+            $bill->buildReminderMessage()
+        );
+
+        if ($sent) {
+            session()->flash('success', 'Notifikasi WhatsApp berhasil dikirim ke ' . $bill->tenant->name);
+        } else {
+            session()->flash('error', 'Gagal mengirim WhatsApp. Pastikan gateway node.js aktif dan nomor tujuan valid.');
+        }
+
+        return back();
     }
 }

@@ -150,10 +150,21 @@
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-right whitespace-nowrap space-x-1.5">
-                                {{-- Tombol Kirim Tagihan via WA --}}
+                                @if ($bill->status !== 'paid')
+                                    <form action="{{ route('bills.sendReminder', $bill) }}" method="POST" class="inline"
+                                        onsubmit="return confirm('Kirim notifikasi tagihan otomatis ke {{ $bill->tenant->name }}?');">
+                                        @csrf
+                                        <button type="submit" title="Kirim Notifikasi Otomatis via WA Gateway"
+                                            class="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1 rounded-md font-medium transition">
+                                            ⚡ Auto WA
+                                        </button>
+                                    </form>
+                                @endif
+
+                                {{-- Tombol Kirim Tagihan via WA (Manual) --}}
                                 @if ($cleanPhone)
                                     <a href="https://wa.me/{{ $cleanPhone }}?text={{ $waMessage }}" target="_blank"
-                                        title="Kirim link invoice ke WhatsApp"
+                                        title="Kirim link invoice ke WhatsApp secara manual"
                                         class="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition">
                                         WA &rarr;
                                     </a>
@@ -252,6 +263,16 @@
                             @endif
                         </div>
                         <div class="flex items-center gap-2">
+                            @if ($bill->status !== 'paid')
+                                <form action="{{ route('bills.sendReminder', $bill) }}" method="POST" class="inline"
+                                    onsubmit="return confirm('Kirim notifikasi tagihan otomatis ke {{ $bill->tenant->name }}?');">
+                                    @csrf
+                                    <button type="submit"
+                                        class="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1 rounded-md font-medium transition">
+                                        ⚡ Auto WA
+                                    </button>
+                                </form>
+                            @endif
                             @if ($cleanPhone)
                                 <a href="https://wa.me/{{ $cleanPhone }}?text={{ $waMessage }}" target="_blank"
                                     class="px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded">
