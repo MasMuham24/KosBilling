@@ -15,13 +15,13 @@ class Tenant extends Model
         'room_id',
         'name',
         'whatsapp_number',
-        'checkin_date',
+        'checkin_in_date',
         'due_date_day',
         'status',
     ];
 
     protected $casts = [
-        'checkin_date' => 'date',
+        'checkin_in_date' => 'date',
         'due_date_day' => 'integer',
     ];
 

@@ -13,7 +13,7 @@ class Payment extends Model
         'bill_id',
         'order_id',
         'transaction_id',
-        'amount_id',
+        'amount_paid',
         'payment_type',
         'transaction_status',
         'proof_image_url',

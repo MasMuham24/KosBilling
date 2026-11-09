@@ -19,7 +19,7 @@ class Room extends Model
     ];
 
     protected $casts = [
-        'monthly_price' => 'decimal:12,2',
+        'monthly_price' => 'decimal:2',
     ];
 
     public function property(): BelongsTo
