@@ -251,5 +251,54 @@ class MidtransWebhookReceiptTest extends TestCase
         $this->assertEquals('paid', $bill->status);
         $this->assertEquals('settlement', $bill->payment->transaction_status);
     }
+
+    public function test_payment_success_endpoint_dispatches_whatsapp_receipt(): void
+    {
+        Http::fake([
+            'http://127.0.0.1:3000/api/send-message' => Http::response(['status' => true], 200),
+        ]);
+
+        $bill = $this->createBillWithRelations('unpaid');
+
+        $response = $this->postJson(route('bills.payment_success', $bill), [
+            'order_id' => "BILL-{$bill->id}-" . time(),
+            'transaction_id' => 'trx-snap-client',
+            'payment_type' => 'qris',
+            'transaction_status' => 'settlement',
+            'gross_amount' => 2000000,
+        ]);
+
+        $response->assertStatus(200);
+        $bill->refresh();
+        $this->assertEquals('paid', $bill->status);
+
+        Http::assertSent(function ($request) use ($bill) {
+            return $request->url() === 'http://127.0.0.1:3000/api/send-message'
+                && $request['target'] === $bill->tenant->whatsapp_number
+                && str_contains($request['message'], "BILL-#{$bill->id}");
+        });
+    }
+
+    public function test_mark_as_paid_dispatches_whatsapp_receipt(): void
+    {
+        Http::fake([
+            'http://127.0.0.1:3000/api/send-message' => Http::response(['status' => true], 200),
+        ]);
+
+        $bill = $this->createBillWithRelations('unpaid');
+        $user = $bill->room->property->user;
+
+        $response = $this->actingAs($user)->post(route('bills.mark_as_paid', $bill));
+
+        $response->assertRedirect();
+        $bill->refresh();
+        $this->assertEquals('paid', $bill->status);
+
+        Http::assertSent(function ($request) use ($bill) {
+            return $request->url() === 'http://127.0.0.1:3000/api/send-message'
+                && $request['target'] === $bill->tenant->whatsapp_number
+                && str_contains($request['message'], 'BUKTI PEMBAYARAN RESMI');
+        });
+    }
 }
 

@@ -13,7 +13,7 @@ class TenantController extends Controller
 {
     public function index()
     {
-        $userProperties = Property::where('user_id', Auth::id())->pluck('id');
+        $userProperties = Property::where('user_id', Auth::id())->pluck('id');     
         $tenants = Tenant::whereHas('room', function ($query) use ($userProperties) {
             $query->whereIn('property_id', $userProperties);
         })->with(['room.property'])->latest()->get();
@@ -53,8 +53,8 @@ class TenantController extends Controller
         }
         $userProperties = Property::where('user_id', Auth::id())->pluck('id');
         $availableRooms = Room::whereIn('property_id', $userProperties)->where(function ($query) use ($tenant) {
-                $query->where('status', 'available')->orWhere('id', $tenant->room_id);
-            })->with('property')->get();
+            $query->where('status', 'available')->orWhere('id', $tenant->room_id);
+        })->with('property')->get();
         return view('tenants.edit', compact('tenant', 'availableRooms'));
     }
 

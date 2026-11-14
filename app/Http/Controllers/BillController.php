@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BillController extends Controller
 {
@@ -184,7 +185,7 @@ class BillController extends Controller
     /**
      * Callback dari frontend setelah proses Midtrans Snap selesai.
      */
-    public function paymentSuccess(Request $request, Bill $bill)
+    public function paymentSuccess(Request $request, Bill $bill, WhatsAppService $waService)
     {
         $orderId = $request->input('order_id', 'BILL-' . $bill->id . '-' . time());
         $transactionId = $request->input('transaction_id');
@@ -192,11 +193,27 @@ class BillController extends Controller
         $transactionStatus = $request->input('transaction_status', 'settlement');
         $grossAmount = $request->input('gross_amount', $bill->total_amount);
 
-        DB::transaction(function () use ($bill, $orderId, $transactionId, $paymentType, $transactionStatus, $grossAmount, $request) {
+        $wasAlreadyPaid = ($bill->status === 'paid');
+        $shouldSendReceipt = false;
+
+        DB::transaction(function () use (
+            $bill,
+            $orderId,
+            $transactionId,
+            $paymentType,
+            $transactionStatus,
+            $grossAmount,
+            $request,
+            $wasAlreadyPaid,
+            &$shouldSendReceipt
+        ) {
             $isPaid = in_array($transactionStatus, ['settlement', 'capture']) || $transactionStatus === 'success';
 
             if ($isPaid) {
                 $bill->update(['status' => 'paid']);
+                if (!$wasAlreadyPaid) {
+                    $shouldSendReceipt = true;
+                }
             } elseif ($transactionStatus === 'pending') {
                 $bill->update(['status' => 'pending_verification']);
             }
@@ -215,6 +232,19 @@ class BillController extends Controller
             );
         });
 
+        // Kirim bukti pembayaran via WhatsApp jika tagihan baru saja lunas
+        if ($shouldSendReceipt) {
+            $bill->load(['tenant', 'room.property', 'payment']);
+            if ($bill->tenant?->whatsapp_number) {
+                try {
+                    $receipt = $bill->buildReceiptMessage();
+                    $waService->sendMessage($bill->tenant->whatsapp_number, $receipt);
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send WhatsApp receipt on paymentSuccess for Bill #{$bill->id}: " . $e->getMessage());
+                }
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Status pembayaran berhasil dicatat.',
@@ -225,11 +255,13 @@ class BillController extends Controller
     /**
      * Tandai tagihan sebagai lunas secara manual oleh pemilik kos.
      */
-    public function markAsPaid(Bill $bill)
+    public function markAsPaid(Bill $bill, WhatsAppService $waService)
     {
         if (Auth::check() && $bill->room->property->user_id !== Auth::id()) {
             abort(403);
         }
+
+        $wasAlreadyPaid = ($bill->status === 'paid');
 
         DB::transaction(function () use ($bill) {
             $bill->update(['status' => 'paid']);
@@ -248,7 +280,22 @@ class BillController extends Controller
             );
         });
 
-        return back()->with('success', "Tagihan #INV-" . str_pad($bill->id, 5, '0', STR_PAD_LEFT) . " berhasil ditandai Lunas.");
+        $waNotice = '';
+        if (!$wasAlreadyPaid) {
+            $bill->load(['tenant', 'room.property', 'payment']);
+            if ($bill->tenant?->whatsapp_number) {
+                try {
+                    $sent = $waService->sendMessage($bill->tenant->whatsapp_number, $bill->buildReceiptMessage());
+                    if ($sent) {
+                        $waNotice = ' & bukti pembayaran terkirim ke WhatsApp';
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send WhatsApp receipt on markAsPaid for Bill #{$bill->id}: " . $e->getMessage());
+                }
+            }
+        }
+
+        return back()->with('success', "Tagihan #INV-" . str_pad($bill->id, 5, '0', STR_PAD_LEFT) . " berhasil ditandai Lunas" . $waNotice . ".");
     }
 
     /**

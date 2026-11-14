@@ -59,8 +59,13 @@ class MidtransWebhookController extends Controller
         $fraudStatus = $notif->fraud_status ?? $request->input('fraud_status');
         $transactionId = $notif->transaction_id ?? $request->input('transaction_id');
 
-        $parts = explode('-', $orderId);
-        $billId = $parts[1] ?? null;
+        $billId = null;
+        if (preg_match('/BILL-(\d+)/i', $orderId, $matches)) {
+            $billId = $matches[1];
+        } else {
+            $parts = explode('-', $orderId);
+            $billId = $parts[1] ?? null;
+        }
 
         $bill = Bill::with(['tenant', 'room.property', 'payment'])->find($billId);
         if (!$bill) {
